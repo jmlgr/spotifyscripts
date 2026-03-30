@@ -1,0 +1,50 @@
+services:
+  spotify-scripts:
+    build: .
+    image: spotify-scripts
+    volumes:
+      # Mount the current directory so .env, .cache, etc. are shared
+      # between the host and the container.
+      - .:/app
+    environment:
+      - RUNNING_IN_DOCKER=1
+    # Interactive by default so OAuth sign-in prompts work.
+    stdin_open: true
+    tty: true
+
+  # Convenience service targets – run as:
+  #   docker compose run setup
+  #   docker compose run script1
+  #   docker compose run script2
+  setup:
+    build: .
+    image: spotify-scripts
+    volumes:
+      - .:/app
+    environment:
+      - RUNNING_IN_DOCKER=1
+    stdin_open: true
+    tty: true
+    command: python setup.py
+
+  script1:
+    build: .
+    image: spotify-scripts
+    volumes:
+      - .:/app
+    environment:
+      - RUNNING_IN_DOCKER=1
+    stdin_open: true
+    tty: true
+    command: python script1_discover_release.py --mode combined
+
+  script2:
+    build: .
+    image: spotify-scripts
+    volumes:
+      - .:/app
+    environment:
+      - RUNNING_IN_DOCKER=1
+    stdin_open: true
+    tty: true
+    command: python script2_daylist_saver.py --mode tracks
