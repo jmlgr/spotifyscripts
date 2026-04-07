@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Setup Script – Spotify Scripts Configuration Wizard
+Setup Script -- Spotify Scripts Configuration Wizard
 
 Walks the user through:
   1. Registering a Spotify Developer application (or using an existing one).
@@ -11,25 +11,31 @@ Walks the user through:
 Supports both local execution and Docker container environments.
 """
 
+import logging
 import os
 import sys
 import webbrowser
+
+import requests
+
+logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
+logger = logging.getLogger(__name__)
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 ENV_FILE = os.path.join(BASE_DIR, ".env")
 ENV_EXAMPLE = os.path.join(BASE_DIR, ".env.example")
 
 BANNER = r"""
-╔══════════════════════════════════════════════╗
-║          Spotify Scripts – Setup             ║
-╚══════════════════════════════════════════════╝
++----------------------------------------------+
+|          Spotify Scripts -- Setup             |
++----------------------------------------------+
 """
 
 DASHBOARD_URL = "https://developer.spotify.com/dashboard"
 
 
 def print_step(step: int, title: str) -> None:
-    print(f"\n── Step {step}: {title} ──")
+    print(f"\n-- Step {step}: {title} --")
 
 
 def ask(prompt: str, default: str = "") -> str:
@@ -54,13 +60,13 @@ def main() -> None:
 
     in_docker = detect_docker()
 
-    # ── Step 1: Create / locate Spotify app ──────────────────────────────────
+    # -- Step 1: Create / locate Spotify app
     print_step(1, "Spotify Developer Application")
     print(f"  Open the Spotify Developer Dashboard: {DASHBOARD_URL}")
     print("  - Click 'Create app'")
     print("  - Give it a name, e.g. 'My Spotify Scripts'")
     print("  - Set the Redirect URI to: http://localhost:8888/callback")
-    print("    (You can change this later – just keep it consistent.)")
+    print("    (You can change this later, just keep it consistent.)")
 
     if not in_docker:
         open_browser = ask(
@@ -69,9 +75,9 @@ def main() -> None:
         if open_browser.lower() == "y":
             webbrowser.open(DASHBOARD_URL)
 
-    input("\n  Press Enter once you have your app's Client ID and Secret ready…")
+    input("\n  Press Enter once you have your app's Client ID and Secret ready...")
 
-    # ── Step 2: Enter credentials ─────────────────────────────────────────────
+    # -- Step 2: Enter credentials
     print_step(2, "Enter Your Credentials")
 
     existing_id = os.getenv("SPOTIPY_CLIENT_ID", "")
@@ -83,23 +89,19 @@ def main() -> None:
     redirect_uri = ask("  Redirect URI", default=existing_uri)
 
     if not client_id or not client_secret:
-        print(
-            "\nERROR: Client ID and Client Secret are required. Exiting.",
-            file=sys.stderr,
-        )
+        logger.error("Client ID and Client Secret are required. Exiting.")
         sys.exit(1)
 
-    # ── Step 3: Test authentication ───────────────────────────────────────────
+    # -- Step 3: Test authentication
     print_step(3, "Sign in with Spotify")
 
-    # Set env vars before importing the client (so it picks them up)
     os.environ["SPOTIPY_CLIENT_ID"] = client_id
     os.environ["SPOTIPY_CLIENT_SECRET"] = client_secret
     os.environ["SPOTIPY_REDIRECT_URI"] = redirect_uri
 
     if in_docker:
         print(
-            "  Running in Docker – the sign-in URL will be printed below.\n"
+            "  Running in Docker. The sign-in URL will be printed below.\n"
             "  Open it in your browser, approve the request, then paste the\n"
             "  resulting URL (which starts with the Redirect URI) back here."
         )
@@ -108,8 +110,6 @@ def main() -> None:
         print("  Approve the request and you will be redirected back.")
 
     try:
-        # Imported here (after env vars are set) so SpotifyOAuth picks up
-        # the credentials we just placed in os.environ.
         import spotipy  # noqa: PLC0415
         from spotipy.oauth2 import SpotifyOAuth  # noqa: PLC0415
 
@@ -125,13 +125,16 @@ def main() -> None:
         user = sp.current_user()
         display_name = user.get("display_name") or user.get("id", "Unknown")
         username = user.get("id", "")
-        print(f"\n  ✓ Signed in successfully as: {display_name} ({username})")
-    except Exception as exc:
-        print(f"\n  ✗ Authentication failed: {exc}", file=sys.stderr)
-        print("  Please check your credentials and try again.", file=sys.stderr)
+        print(f"\n  Signed in successfully as: {display_name} ({username})")
+    except spotipy.SpotifyException as exc:
+        logger.error("Spotify authentication failed: %s", exc)
+        logger.error("Check your Client ID, Client Secret, and Redirect URI.")
+        sys.exit(1)
+    except requests.ConnectionError:
+        logger.error("Network error. Check your internet connection and try again.")
         sys.exit(1)
 
-    # ── Step 4: Write .env file ───────────────────────────────────────────────
+    # -- Step 4: Write .env file
     print_step(4, "Save Configuration")
 
     env_lines = [
@@ -144,16 +147,17 @@ def main() -> None:
 
     with open(ENV_FILE, "w", encoding="utf-8") as f:
         f.writelines(env_lines)
+    os.chmod(ENV_FILE, 0o600)
 
-    print(f"  ✓ Configuration saved to {ENV_FILE}")
+    logger.info("Configuration saved to %s (permissions: owner-only)", ENV_FILE)
 
-    # ── Done ──────────────────────────────────────────────────────────────────
+    # -- Done
     print(
-        "\n╔══════════════════════════════════════════════╗\n"
-        "║  Setup complete! You can now run:            ║\n"
-        "║    python script1_discover_release.py        ║\n"
-        "║    python script2_daylist_saver.py           ║\n"
-        "╚══════════════════════════════════════════════╝"
+        "\n+----------------------------------------------+\n"
+        "|  Setup complete! You can now run:            |\n"
+        "|    python script1_discover_release.py        |\n"
+        "|    python script2_daylist_saver.py           |\n"
+        "+----------------------------------------------+"
     )
 
 

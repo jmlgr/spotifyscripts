@@ -4,7 +4,10 @@ These tests mock all Spotify API calls so no credentials are needed.
 """
 
 import unittest
-from unittest.mock import MagicMock, call, patch
+from unittest.mock import MagicMock, patch
+
+import requests
+import spotipy
 
 # ---------------------------------------------------------------------------
 # Helpers to build fake Spotify API objects
@@ -117,10 +120,42 @@ class TestFindPlaylistByName(unittest.TestCase):
 
         sp = MagicMock()
         sp.current_user_playlists.return_value = paged(
-            [make_playlist("p1", "daylist • evening vibes • monday"), make_playlist("p2", "daylist")]
+            [make_playlist("p1", "daylist - evening vibes - monday"), make_playlist("p2", "daylist")]
         )
         result = find_playlist_by_name(sp, "daylist", exact=True)
         self.assertEqual(result["id"], "p2")
+
+    def test_prefix_match(self):
+        from spotify_client import find_playlist_by_name
+
+        sp = MagicMock()
+        sp.current_user_playlists.return_value = paged([
+            make_playlist("p1", "my daylist backup"),
+            make_playlist("p2", "daylist - chill morning monday"),
+        ])
+        result = find_playlist_by_name(sp, "daylist", prefix=True)
+        # Should match p2 (starts with "daylist"), not p1 ("my daylist...")
+        self.assertEqual(result["id"], "p2")
+
+    def test_prefix_match_no_result(self):
+        from spotify_client import find_playlist_by_name
+
+        sp = MagicMock()
+        sp.current_user_playlists.return_value = paged([
+            make_playlist("p1", "my daylist backup"),
+        ])
+        result = find_playlist_by_name(sp, "daylist", prefix=True)
+        self.assertIsNone(result)
+
+    def test_exact_match_rejects_substring(self):
+        from spotify_client import find_playlist_by_name
+
+        sp = MagicMock()
+        sp.current_user_playlists.return_value = paged([
+            make_playlist("p1", "My Discover Weekly Extended"),
+        ])
+        result = find_playlist_by_name(sp, "Discover Weekly", exact=True)
+        self.assertIsNone(result)
 
 
 class TestAddTracksToPlaylist(unittest.TestCase):
@@ -156,6 +191,135 @@ class TestGetAlbumTrackIds(unittest.TestCase):
         self.assertEqual(ids, ["t1", "t2"])
 
 
+class TestGetCurrentUserId(unittest.TestCase):
+    def test_returns_user_id(self):
+        from spotify_client import get_current_user_id
+
+        sp = MagicMock()
+        sp.current_user.return_value = {"id": "testuser", "display_name": "Test"}
+        self.assertEqual(get_current_user_id(sp), "testuser")
+
+    def test_raises_on_missing_id(self):
+        from spotify_client import get_current_user_id
+
+        sp = MagicMock()
+        sp.current_user.return_value = {}
+        with self.assertRaises(ValueError):
+            get_current_user_id(sp)
+
+
+class TestCreatePlaylist(unittest.TestCase):
+    def test_creates_and_returns(self):
+        from spotify_client import create_playlist
+
+        sp = MagicMock()
+        sp.user_playlist_create.return_value = make_playlist("new_id", "Test")
+        result = create_playlist(sp, "user1", "Test")
+        self.assertEqual(result["id"], "new_id")
+
+    def test_raises_on_bad_response(self):
+        from spotify_client import create_playlist
+
+        sp = MagicMock()
+        sp.user_playlist_create.return_value = {}
+        with self.assertRaises(ValueError):
+            create_playlist(sp, "user1", "Test")
+
+
+# ---------------------------------------------------------------------------
+# Tests for retry logic
+# ---------------------------------------------------------------------------
+
+class TestRetryOnTransient(unittest.TestCase):
+    @patch("spotify_client.time.sleep")
+    def test_retries_on_rate_limit(self, mock_sleep):
+        from spotify_client import get_current_user_id
+
+        sp = MagicMock()
+        rate_limit_exc = spotipy.SpotifyException(429, -1, "rate limited")
+        rate_limit_exc.headers = {"Retry-After": "1"}
+        sp.current_user.side_effect = [
+            rate_limit_exc,
+            {"id": "testuser"},
+        ]
+        result = get_current_user_id(sp)
+        self.assertEqual(result, "testuser")
+        self.assertEqual(sp.current_user.call_count, 2)
+
+    @patch("spotify_client.time.sleep")
+    def test_retries_on_server_error(self, mock_sleep):
+        from spotify_client import get_current_user_id
+
+        sp = MagicMock()
+        server_exc = spotipy.SpotifyException(500, -1, "server error")
+        server_exc.headers = {}
+        sp.current_user.side_effect = [
+            server_exc,
+            {"id": "testuser"},
+        ]
+        result = get_current_user_id(sp)
+        self.assertEqual(result, "testuser")
+
+    @patch("spotify_client.time.sleep")
+    def test_retries_on_connection_error(self, mock_sleep):
+        from spotify_client import get_current_user_id
+
+        sp = MagicMock()
+        sp.current_user.side_effect = [
+            requests.ConnectionError("connection refused"),
+            {"id": "testuser"},
+        ]
+        result = get_current_user_id(sp)
+        self.assertEqual(result, "testuser")
+
+    def test_does_not_retry_on_client_error(self):
+        from spotify_client import get_current_user_id
+
+        sp = MagicMock()
+        client_exc = spotipy.SpotifyException(404, -1, "not found")
+        client_exc.headers = {}
+        sp.current_user.side_effect = client_exc
+        with self.assertRaises(spotipy.SpotifyException):
+            get_current_user_id(sp)
+        # Should fail immediately, no retries
+        self.assertEqual(sp.current_user.call_count, 1)
+
+
+# ---------------------------------------------------------------------------
+# Tests for error paths in scripts
+# ---------------------------------------------------------------------------
+
+class TestScript1ErrorPaths(unittest.TestCase):
+    @patch("script1_discover_release.get_spotify_client")
+    def test_missing_playlist_exits(self, mock_client):
+        sp = MagicMock()
+        sp.current_user.return_value = {"id": "testuser"}
+        sp.current_user_playlists.return_value = paged([
+            make_playlist("p1", "Some Other Playlist"),
+        ])
+        mock_client.return_value = sp
+
+        import script1_discover_release as s1
+        with self.assertRaises(SystemExit):
+            s1.run(mode="discover")
+
+
+class TestScript2ErrorPaths(unittest.TestCase):
+    @patch("script2_daylist_saver.get_spotify_client")
+    def test_empty_daylist_exits(self, mock_client):
+        sp = MagicMock()
+        sp.current_user.return_value = {"id": "testuser"}
+        sp.current_user_playlists.return_value = paged([
+            make_playlist("dl_id", "daylist - morning vibes"),
+        ])
+        sp.playlist_tracks.return_value = paged([])
+        mock_client.return_value = sp
+
+        import script2_daylist_saver as s2
+        with self.assertRaises(SystemExit):
+            s2.run(mode="tracks")
+
+
 # ---------------------------------------------------------------------------
 # Integration-style tests for script1 and script2 (mocked API)
 # ---------------------------------------------------------------------------
@@ -173,7 +337,6 @@ class TestScript1Run(unittest.TestCase):
 
         sp.current_user_playlists.side_effect = current_user_playlists
 
-        # Two tracks per source playlist, different albums
         sp.playlist_tracks.side_effect = lambda pid, **kw: paged(
             [
                 {"track": make_track("t1", "a1")},
@@ -220,7 +383,7 @@ class TestScript1Run(unittest.TestCase):
 
 
 class TestScript2Run(unittest.TestCase):
-    def _make_sp(self, daylist_title="daylist • morning vibes • monday"):
+    def _make_sp(self, daylist_title="daylist - morning vibes - monday"):
         sp = MagicMock()
         sp.current_user.return_value = {"id": "testuser"}
 
@@ -242,7 +405,6 @@ class TestScript2Run(unittest.TestCase):
         sp = mock_client.return_value
         sp.user_playlist_create.assert_called_once()
         args = sp.user_playlist_create.call_args
-        # Name should include the daylist title and a date
         self.assertIn("daylist", args[1]["name"].lower())
 
     @patch("script2_daylist_saver.get_spotify_client")
@@ -251,7 +413,6 @@ class TestScript2Run(unittest.TestCase):
         import script2_daylist_saver as s2
         s2.run(mode="albums")
         sp = mock_client.return_value
-        # album_tracks should have been called for each unique album
         self.assertGreater(sp.album_tracks.call_count, 0)
         args = sp.user_playlist_create.call_args
         self.assertIn("Albums", args[1]["name"])
