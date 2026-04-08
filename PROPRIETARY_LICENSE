@@ -1,0 +1,15 @@
+Advanced Spotify Playlist Tools - Proprietary Components
+Copyright (c) 2026 jmlgr. All rights reserved.
+
+Certain components of this software (distributed only in pre-built Docker
+images) are proprietary and not covered by the AGPL license. These components
+include internal API integrations that enable personalized playlist access.
+
+You may run the pre-built Docker image for personal, non-commercial purposes.
+You may NOT:
+- Redistribute the Docker image or its proprietary components
+- Modify, decompile, or reverse-engineer the proprietary components
+- Use the proprietary components for commercial purposes
+- Host the software publicly for third-party access without permission
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND.
