@@ -1,0 +1,21 @@
+# Environment / secrets – never commit these
+.env
+.cache
+.cache-*
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+.venv/
+venv/
+
+# Docker
+*.log
+
+# macOS
+.DS_Store
+.throughline/
+.claude/

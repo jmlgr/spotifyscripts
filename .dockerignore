@@ -1,0 +1,9 @@
+.git/
+.claude/
+.throughline/
+__pycache__/
+*.pyc
+.env
+.cache*
+docs/
+.DS_Store
