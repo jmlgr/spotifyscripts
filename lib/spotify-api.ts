@@ -152,17 +152,17 @@ export async function getAllPlaylistTracks(
   let nextUrl: string | null = `/playlists/${playlistId}/tracks`;
 
   while (nextUrl) {
-    const fullUrl = nextUrl.startsWith("http") ? nextUrl : `${SPOTIFY_API}${nextUrl}`;
-    const res = await fetch(fullUrl, {
+    const fullUrl: string = nextUrl.startsWith("http") ? nextUrl : `${SPOTIFY_API}${nextUrl}`;
+    const res: Response = await fetch(fullUrl, {
       headers: { Authorization: `Bearer ${accessToken}` },
     });
     if (!res.ok) break;
 
-    const data = await res.json();
+    const data: { items?: { track?: SpotifyTrack }[]; next?: string | null } = await res.json();
     for (const item of data.items ?? []) {
       if (item.track?.id) tracks.push(item.track);
     }
-    nextUrl = data.next;
+    nextUrl = data.next ?? null;
   }
 
   return tracks;
@@ -184,14 +184,14 @@ export async function getAlbumTrackIds(accessToken: string, albumId: string): Pr
   const ids: string[] = [];
   let nextUrl: string | null = `/albums/${albumId}/tracks?limit=50`;
   while (nextUrl) {
-    const fullUrl = nextUrl.startsWith("http") ? nextUrl : `${SPOTIFY_API}${nextUrl}`;
-    const res = await fetch(fullUrl, { headers: { Authorization: `Bearer ${accessToken}` } });
+    const fullUrl: string = nextUrl.startsWith("http") ? nextUrl : `${SPOTIFY_API}${nextUrl}`;
+    const res: Response = await fetch(fullUrl, { headers: { Authorization: `Bearer ${accessToken}` } });
     if (!res.ok) break;
-    const data = await res.json();
+    const data: { items?: { id?: string }[]; next?: string | null } = await res.json();
     for (const item of data.items ?? []) {
       if (item.id) ids.push(item.id);
     }
-    nextUrl = data.next;
+    nextUrl = data.next ?? null;
   }
   return ids;
 }
