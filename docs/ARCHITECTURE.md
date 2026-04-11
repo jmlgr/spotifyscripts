@@ -18,7 +18,7 @@ The app uses **iron-session** to store encrypted session data in an HTTP-only co
 
 1. **OAuth token** - Standard Spotify Authorization Code flow. Used for all Web API calls: reading playlists, creating playlists, modifying library, searching. Refreshes automatically when near expiration.
 
-2. **Internal token (optional)** - Enables access to personalized playlists (Discover Weekly, Release Radar, daylist, Daily Mixes) that Spotify removed from the public API in November 2024. The user manually provides this token from the Spotify web player. It has a 2-hour TTL and cannot be refreshed programmatically.
+2. **Internal token (optional)** - Enables access to personalized playlists (Discover Weekly, Release Radar, daylist, Daily Mixes) that Spotify removed from the public API in November 2024. This token is derived from the session cookie that Spotify already places in your browser when you log in to the web player. The app uses this to make requests on your behalf using your existing browser authentication. It has a 2-hour TTL and cannot be refreshed programmatically.
 
 Both tokens are stored encrypted in the session cookie. The client never sees either token directly.
 
@@ -33,7 +33,7 @@ api/
     callback/       # Handles OAuth redirect
     logout/         # Clears session
     me/             # Current user info
-    spdc/           # Internal token management
+    internal-token/ # Internal token management
     token-status/   # Token TTL check
   playlists/
     create/         # Create playlists (expand, merge)
@@ -63,7 +63,7 @@ Top-level layout. Renders sidebar navigation, manages active view state, handles
 Each feature is a self-contained view under `src/components/views/`. Views fetch their own data via API calls and manage local state. Examples: `DashboardView`, `DaylistView`, `ArtistPopularityView`, `DiffView`.
 
 ### Contexts
-`src/contexts/AppContext.tsx` provides auth state, library data, and shared handlers (login, logout, sp_dc management) to the component tree.
+`src/contexts/AppContext.tsx` provides auth state, library data, and shared handlers (login, logout, internal token management) to the component tree.
 
 ## Open Source Components
 

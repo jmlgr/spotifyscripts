@@ -141,7 +141,7 @@ Common mistakes:
 
 ### Personalized playlists (Discover Weekly, daylist) are empty or missing
 
-Personalized playlists require an internal token from the Spotify web player. Go to Settings in the app and follow the instructions to add your token. The token lasts about 2 hours and needs to be refreshed manually when it expires.
+Personalized playlists use the session cookie that Spotify already places in your browser when you're logged in to the web player. The app uses this to make requests on your behalf. Go to Settings in the app and follow the instructions to provide your token. It lasts about 2 hours and needs to be refreshed manually when it expires.
 
 ### "Session expired" or constant redirects to login
 

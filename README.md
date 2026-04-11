@@ -12,7 +12,7 @@ Nothing here takes anything away from Spotify. It's a tool to enhance your exper
 
 ## Try It
 
-**Hosted version (near-instant):** [spotifyscripts-web.vercel.app](https://spotifyscripts-web.vercel.app)
+**Hosted version (near-instant):** [spotifyscripts-web.vercel.app](https://spotifyscripts-web.vercel.app) — The hosted version may include features under active development that aren't in the stable Docker release yet.
 
 > **Important:** The hosted version uses a shared Spotify Developer app that hasn't been submitted for Spotify's extended quota review. This means "Sign in with Spotify" may not work for your account unless you've been added as a tester. For the best experience, use **Bring Your Own Key (BYOK)**: enter your own Spotify Developer app credentials on the welcome screen before signing in. This takes about 2 minutes and works immediately.
 >
@@ -43,7 +43,7 @@ Nothing here takes anything away from Spotify. It's a tool to enhance your exper
 - Browse library organized by Spotify's folder structure
 - Liked Songs browser with shuffle, random load, and playlist creation
 
-**How it works:** Uses Spotify's standard Web API for most features. For personalized playlists (which Spotify blocked from the public API in Nov 2024), uses an optional internal token from the Spotify web player. The app walks you through this in Settings.
+**How it works:** Uses Spotify's standard Web API for most features. For personalized playlists (which Spotify blocked from the public API in Nov 2024), the app can use the session cookie Spotify already places in your browser to make requests on your behalf. The app walks you through this in Settings.
 
 ## Self-Host Setup
 
